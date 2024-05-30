@@ -19,20 +19,29 @@ countriesLayer.subset_filter("admin = 'Italy'")
 nameIndexRegions = countriesLayer.field_index('region')
 countriesFeatures = countriesLayer.features()
 
-regions_gpkg = []
 regions_gpkgMap = {}
+
+crsHelper = HCrs()
+crsHelper.from_srid(4326)
+crsHelper.to_srid(3857)
+
+canvas = HMapCanvas.new()
+
+osm = HMap.get_osm_layer()
+canvas.set_layers([osm])
 
 for feature in countriesFeatures:
     geometry = feature.geometry
     region = feature.attributes[nameIndexRegions]
     if regions_gpkgMap.get(region):
-        regions_gpkgMap[region].append()
-    regions_gpkgMap[region] = []
+        regions_gpkgMap[region] = regions_gpkgMap[region].union(geometry)
+    else:
+        regions_gpkgMap[region] = geometry
 
+for item in regions_gpkgMap.values():
+    canvas.add_geometry(crsHelper.transform(item))
 
-
-print(regions_gpkgMap)
-
+# csv file
 
 with open(csvPath, 'r') as file:
     lines = file.readlines()
@@ -44,32 +53,26 @@ for i in range(len(line1Split)):
         latIndex = i+1
         lonIndex = i+2
 
-# regions = []
+
 regionsMap = {}
 
-crsHelper = HCrs()
-crsHelper.from_srid(4326)
-crsHelper.to_srid(3857)
-
-#canvas = HMapCanvas.new()
-
-#osm = HMap.get_osm_layer()
-#canvas.set_layers([osm])
 
 for line in lines[1:]:
     line = line.strip()
     lineSplit = line.split(',')
-    if lineSplit[regionIndex] not in regions:
-        regions.append(lineSplit[regionIndex])
+    region = lineSplit[regionIndex]
     lon = float(lineSplit[lonIndex])
     lat = float(lineSplit[latIndex])
-    
-    #canvas.add_geometry(crsHelper.transform(HPoint(lon,lat)))
+    regionCity = HPoint(lon,lat)
+    for regionGeometry in regions_gpkgMap.values():
+        if regionCity.intersects(regionGeometry):
+            regionsMap[region] = regionGeometry
+    canvas.add_geometry(crsHelper.transform(HPoint(lon,lat)))
+canvas.set_extent(crsHelper.transform(item).bbox())
+canvas.show()
 
-#canvas.show()
 
-
-
+print(regionsMap)
 #print(regions)
 
 
