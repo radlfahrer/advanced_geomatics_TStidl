@@ -7,13 +7,20 @@ from pyqgis_scripting_ext.core import *
 data_folder = 'C:/Users/timo/Documents/GitHub/advanced_geomatics/data/'
 csvPath = data_folder + 'dpc-covid19-ita-regioni.csv'
 geopackagePath = data_folder + 'reduced_ne.gpkg'
+output_folder = 'C:/Users/timo/Documents/GitHub/advanced_geomatics/tmp/'
 
 provincesName = 'ne_10m_admin_1_states_provinces'
 
+
+# remove layers
+HMap.remove_layers_by_name([provincesName])
 # gpkg combine provinces to regions
 
 countriesLayer = HVectorLayer.open(geopackagePath, provincesName)
 countriesLayer.subset_filter("admin = 'Italy'")
+
+#HMap.add_layer(countriesLayer)
+
 #print(countriesLayer.fields.items())
 #nameIndexCountries = countriesLayer.field_index('admin')
 nameIndexRegions = countriesLayer.field_index('region')
@@ -52,18 +59,48 @@ for i in range(len(line1Split)):
         regionIndex = i
         latIndex = i+1
         lonIndex = i+2
-
+    skip_addition = [i for i in range(len(line1Split)) if line1Split[i].startswith('note') or line1Split[i].startswith('codice')]
 
 regionsMap = {}
 
+# 0 (date), 3 (region), 17 (total cases)
 
-for line in lines[1:]:
+day2featuresMap = {}
+
+for index, line in enumerate(lines[1:]):
     line = line.strip()
     lineSplit = line.split(',')
-    region = lineSplit[regionIndex]
-    lon = float(lineSplit[lonIndex])
-    lat = float(lineSplit[latIndex])
-    regionCity = HPoint(lon,lat)
+    if not lineSplit[regionIndex].startswith('P.A'):
+        region = lineSplit[regionIndex]
+        lon = float(lineSplit[lonIndex])
+        lat = float(lineSplit[latIndex])
+        regionCity = HPoint(lon,lat)
+    elif lineSplit[regionIndex].startswith('P.A. Bolzano'):
+        continue
+    else:
+        region = 'Trentino-Alto Adige'
+        lon = float(lineSplit[lonIndex])
+        lat = float(lineSplit[latIndex])
+        regionCity = HPoint(lon,lat)
+        newlineSplit = []
+        for i in range(len(lineSplit)):
+            if i <= lonIndex or i >19:
+                newlineSplit.append(lineSplit[i])
+            else:
+                if len(lineSplit[i]) == 0:
+                    newlineSplit.append(lineSplit[i])
+                    #continue
+                else:
+                    region_sum = int(lineSplit[i]) + int(lines[index-1].strip().split(',')[i])
+                    newlineSplit.append(region_sum)
+        lineSplit = newlineSplit
+    dayAndTime = lineSplit[0]
+    dayAndTime = dayAndTime.split('T')
+    day = dayAndTime[0]
+    if day.endswith('01'):
+        totalCases = int(lineSplit[17])
+        print(totalCases)
+    
     for regionGeometry in regions_gpkgMap.values():
         if regionCity.intersects(regionGeometry):
             regionsMap[region] = regionGeometry
@@ -72,22 +109,9 @@ canvas.set_extent(crsHelper.transform(item).bbox())
 canvas.show()
 
 
-print(regionsMap)
-#print(regions)
+#print(regionsMap)
 
 
-
-same_name = []
-different_name = []
-
-for region in regions:
-    if region in regions_gpkg:
-        same_name.append(region)
-    else:
-        different_name.append(region)
-#print(same_name)
-#print(different_name)
-
-conversionMap = {
-    
-}
+featuresList = day2featuresMap.get(day)
+if featuresList:
+    featuresList.append()
